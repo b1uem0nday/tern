@@ -1,0 +1,31 @@
+//protoc --proto_path=. --proto_path=$HOME/.cache/JetBrains/GoLand2022.1/protoeditor/google/protobuf --go-grpc_out=. --go_out=. api/tern.proto
+syntax = "proto3";
+import "google/protobuf/empty.proto";
+
+package tern;
+
+option go_package="./api";
+
+/*message ConnectRequest{
+  string login = 1;
+  string password = 2;
+  string host = 3;
+  uint64 port = 4;
+}*/
+message ConnectRequest{
+  string connection_string = 1;
+}
+message ConnectAndUpdateRequest{
+    ConnectRequest connect_request = 1;
+    optional uint64 destination_version = 2;
+}
+
+message VersionMessage{
+  uint64 version = 1;
+}
+service MigrationService {
+  rpc Connect (ConnectRequest) returns (google.protobuf.Empty){}
+  //rpc GetVersion(??) returns (google.protobuf.Empty){}
+  rpc ConnectAndUpdate(ConnectAndUpdateRequest) returns (VersionMessage) {}
+  rpc ForceVersion(VersionMessage) returns (google.protobuf.Empty){}
+}

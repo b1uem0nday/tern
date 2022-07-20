@@ -5,6 +5,10 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
+const (
+	versionTableName = "version"
+)
+
 // Lock to ensure multiple migrations cannot occur simultaneously
 const lockNum = int64(9628173550095224) // arbitrary random number
 

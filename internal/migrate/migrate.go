@@ -15,10 +15,7 @@ import (
 //template - 0001-init.sql
 var migrationPattern = regexp.MustCompile(`\A(\d{1,4})-.+\.sql\z`)
 
-const (
-	versionTableName   = "version"
-	createVersionTable = `create table if not exists %s(version int4 not null); insert into %s(version) select 0 where 0=(select count(*) from %s)`
-)
+const migrationPath = "/home/irina/Documents/tern/scripts/migrations/"
 
 type (
 	Migration struct {
@@ -34,16 +31,27 @@ type (
 	}
 )
 
-func NewMigrator(ctx context.Context, conn *pgx.Conn) (m *Migrator, err error) {
-	return NewMigratorEx(ctx, conn)
-}
-func NewMigratorEx(ctx context.Context, conn *pgx.Conn) (m *Migrator, err error) {
-	m = &Migrator{conn: conn}
-	err = m.ensureSchemaVersionTableExists(ctx)
+func NewMigrator(ctx context.Context, connString string) (m *Migrator, err error) {
+	m = &Migrator{}
+	m.conn, err = pgx.Connect(ctx, connString)
+	if err != nil {
+		return nil, err
+	}
 	m.Migrations = make([]*Migration, 0)
 
+	err = m.ensureSchemaVersionTableExists(ctx)
+	if err != nil {
+		m.conn.Close(ctx)
+		return nil, err
+	}
+
+	if err = m.LoadMigrations(migrationPath + m.conn.Config().Database); err != nil {
+		m.conn.Close(ctx)
+		return nil, err
+	}
 	return
 }
+
 func (m *Migrator) ensureSchemaVersionTableExists(ctx context.Context) (err error) {
 	err = acquireAdvisoryLock(ctx, m.conn)
 	if err != nil {
@@ -68,6 +76,16 @@ func (m *Migrator) versionTableExists(ctx context.Context) (ok bool, err error) 
 	var count int
 	err = m.conn.QueryRow(ctx, "select count(*) from pg_catalog.pg_class where relname=$1 and relkind='r' and pg_table_is_visible(oid)", versionTableName).Scan(&count)
 	return count > 0, err
+}
+
+func (m *Migrator) ForceVersion(ctx context.Context, version uint) error {
+	if int(version) > len(m.Migrations) {
+		return fmt.Errorf("version %d is higher than existent one", version)
+	}
+
+	_, err := m.conn.Exec(ctx, forceInsertVersionTable, version)
+
+	return err
 }
 
 func (m *Migrator) LoadMigrations(path string) error {
