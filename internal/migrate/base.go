@@ -23,10 +23,6 @@ func releaseAdvisoryLock(ctx context.Context, conn *pgx.Conn) error {
 	return err
 }
 
-func createStoredVersionCheck(ctx context.Context, conn *pgx.Conn) error {
-	_, err := conn.Exec(ctx, "", lockNum)
-	return err
-}
 func getCurrentVersion(ctx context.Context, conn *pgx.Conn) (v int, err error) {
 	err = conn.QueryRow(ctx, "select version from "+versionTableName).Scan(&v)
 	return v, err
@@ -55,7 +51,13 @@ func ensureRequiredExists(ctx context.Context, conn *pgx.Conn) error {
 	if err != nil {
 		return err
 	}
-	_, err = conn.Exec(ctx, fmt.Sprintf(createVersionCheckFunc, versionTableName))
+	_, err = conn.Exec(ctx, fmt.Sprintf(createVersionCheckFunc, versionTableName, versionTableName))
 	return err
 
+}
+
+func dropService(ctx context.Context, conn *pgx.Conn) error {
+	_, err := conn.Exec(ctx, fmt.Sprintf(dropServiceData, versionTableName))
+
+	return err
 }

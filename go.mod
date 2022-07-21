@@ -1,6 +1,6 @@
 module github.com/b1uem0nday/tern
 
-go 1.18
+go 1.17
 
 require (
 	github.com/jackc/pgconn v1.12.1

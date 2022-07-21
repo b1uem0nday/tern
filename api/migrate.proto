@@ -17,10 +17,11 @@ message VersionMessage{
 message MigrateRequest{
     string connection_string = 1;
     optional uint64 destination_version = 2;
+    optional string migrations_path  = 3;
 }
 
 service MigrationService {
-  //rpc GetVersion(??) returns (google.protobuf.Empty){}
+  // rpc GetVersion(??) returns (google.protobuf.Empty){}
   rpc Migrate(MigrateRequest) returns (VersionMessage) {}
  // rpc ForceVersion(VersionMessage) returns (google.protobuf.Empty){}
 }

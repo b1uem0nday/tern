@@ -22,7 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type MigrationServiceClient interface {
-	//rpc GetVersion(??) returns (google.protobuf.Empty){}
+	// rpc GetVersion(??) returns (google.protobuf.Empty){}
 	Migrate(ctx context.Context, in *MigrateRequest, opts ...grpc.CallOption) (*VersionMessage, error)
 }
 
@@ -47,7 +47,7 @@ func (c *migrationServiceClient) Migrate(ctx context.Context, in *MigrateRequest
 // All implementations must embed UnimplementedMigrationServiceServer
 // for forward compatibility
 type MigrationServiceServer interface {
-	//rpc GetVersion(??) returns (google.protobuf.Empty){}
+	// rpc GetVersion(??) returns (google.protobuf.Empty){}
 	Migrate(context.Context, *MigrateRequest) (*VersionMessage, error)
 	mustEmbedUnimplementedMigrationServiceServer()
 }

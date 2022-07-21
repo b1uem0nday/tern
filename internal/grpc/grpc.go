@@ -7,25 +7,25 @@ import (
 	"google.golang.org/grpc"
 	"log"
 	"net"
-	"strconv"
 )
 
 type Server struct {
 	ctx      context.Context
 	gs       *grpc.Server
 	listener net.Listener
-	path     string
 	p.UnimplementedMigrationServiceServer
+	migrationsPool []migrate.Migrate
 }
 
-func NewServer(ctx context.Context, path string, port uint64) (*Server, error) {
+func NewServer(ctx context.Context, path string, port string) (*Server, error) {
+	if err := migrate.SetDefaultPath(path); err != nil {
+		return nil, err
+	}
 	gg := Server{
-		ctx:  ctx,
-		path: path,
+		ctx: ctx,
 	}
 	var err error
-
-	gg.listener, err = net.Listen("tcp", ":"+strconv.FormatUint(port, 10))
+	gg.listener, err = net.Listen("tcp", ":"+port)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,12 @@ func (gg *Server) Migrate(ctx context.Context, request *p.MigrateRequest) (*p.Ve
 	if err != nil {
 		return &response, err
 	}
-	err = m.LoadMigrations(gg.path)
+	if request.MigrationsPath == nil {
+		err = m.LoadMigrationWithDefaultPath()
+	} else {
+		err = m.LoadMigrations(*request.MigrationsPath)
+	}
+
 	if err != nil {
 		return &response, err
 	}
