@@ -137,11 +137,11 @@ func FindMigrationsEx(path string) ([]string, error) {
 		}
 
 		if n < int64(len(paths)+1) {
-			return nil, fmt.Errorf("Duplicate migration %d", n)
+			return nil, fmt.Errorf("duplicate migration %d", n)
 		}
 
 		if int64(len(paths)+1) < n {
-			return nil, fmt.Errorf("Missing migration %d", len(paths)+1)
+			return nil, fmt.Errorf("missing migration %d", len(paths)+1)
 		}
 
 		paths = append(paths, filepath.Join(path, fi.Name()))
@@ -191,22 +191,14 @@ func (m *Migrator) MigrateTo(ctx context.Context, targetVersion int) (err error)
 		return fmt.Errorf("current version %d is outside the valid versions of 0 to %d", currentVersion, len(m.Migrations))
 	}
 
-	var direction int
-	if currentVersion < targetVersion {
-		direction = 1
-	} else {
-		direction = -1
-	}
-
 	for currentVersion != targetVersion {
 		var current *Migration
 		var sql string
 		var sequence int32
-		if direction == 1 {
-			current = m.Migrations[currentVersion]
-			sequence = current.Sequence
-			sql = current.SQL
-		}
+
+		current = m.Migrations[currentVersion]
+		sequence = current.Sequence
+		sql = current.SQL
 
 		var tx pgx.Tx
 		tx, err = m.conn.Begin(ctx)
@@ -238,7 +230,7 @@ func (m *Migrator) MigrateTo(ctx context.Context, targetVersion int) (err error)
 			return err
 		}
 
-		currentVersion = currentVersion + direction
+		currentVersion++
 	}
 
 	return nil

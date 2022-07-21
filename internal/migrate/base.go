@@ -22,6 +22,10 @@ func releaseAdvisoryLock(ctx context.Context, conn *pgx.Conn) error {
 	return err
 }
 
+func createStoredVersionCheck(ctx context.Context, conn *pgx.Conn) error {
+	_, err := conn.Exec(ctx, "", lockNum)
+	return err
+}
 func (m *Migrator) GetCurrentVersion(ctx context.Context) (v int, err error) {
 	err = m.conn.QueryRow(ctx, "select version from "+versionTableName).Scan(&v)
 	return v, err
