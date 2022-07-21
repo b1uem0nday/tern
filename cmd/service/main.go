@@ -2,23 +2,17 @@ package main
 
 import (
 	"context"
-	"github.com/b1uem0nday/tern/internal/migrate"
+	"github.com/b1uem0nday/tern/internal/grpc"
 	"log"
 )
 
 //проверить хранимые процедуры + функции на корректность создания
-//template = 01-blablabla.sql, 02-nanana.sql
 func main() {
 	ctx := context.Background()
-
-	m, err := migrate.NewMigrator(ctx, "postgres://user:P@ssw0rd@localhost:5432/test_migration")
+	server, err := grpc.NewServer(ctx, "/home/irina/Documents/tern/scripts/migrations/", 5000)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("grpc connection: %v", err)
 	}
-
-	err = m.Migrate(ctx)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+	server.Run()
+	<-ctx.Done()
 }

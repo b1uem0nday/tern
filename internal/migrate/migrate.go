@@ -5,152 +5,50 @@ import (
 	"fmt"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v4"
-	"io/ioutil"
-	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
 )
-
-//template - 0001-init.sql
-var migrationPattern = regexp.MustCompile(`\A(\d{1,4})-.+\.sql\z`)
 
 const migrationPath = "/home/irina/Documents/tern/scripts/migrations/"
 
 type (
+	Migrator interface {
+	}
 	Migration struct {
 		Sequence int32
 		Name     string
 		SQL      string
 	}
-	DefaultMigratorFS struct{}
-
-	Migrator struct {
+	Migrate struct {
 		conn       *pgx.Conn
 		Migrations []*Migration
 	}
 )
 
-func NewMigrator(ctx context.Context, connString string) (m *Migrator, err error) {
-	m = &Migrator{}
+func NewMigrator(ctx context.Context, connString string) (m *Migrate, err error) {
+	m = &Migrate{}
 	m.conn, err = pgx.Connect(ctx, connString)
 	if err != nil {
 		return nil, err
 	}
 	m.Migrations = make([]*Migration, 0)
 
-	err = m.ensureSchemaVersionTableExists(ctx)
+	err = ensureRequiredExists(ctx, m.conn)
 	if err != nil {
 		m.conn.Close(ctx)
 		return nil, err
 	}
-
-	if err = m.LoadMigrations(migrationPath + m.conn.Config().Database); err != nil {
-		m.conn.Close(ctx)
-		return nil, err
-	}
-	return
+	return m, nil
 }
 
-func (m *Migrator) ensureSchemaVersionTableExists(ctx context.Context) (err error) {
-	err = acquireAdvisoryLock(ctx, m.conn)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		unlockErr := releaseAdvisoryLock(ctx, m.conn)
-		if err == nil && unlockErr != nil {
-			err = unlockErr
-		}
-	}()
-
-	if ok, err := m.versionTableExists(ctx); err != nil || ok {
-		return err
-	}
-
-	_, err = m.conn.Exec(ctx, fmt.Sprintf(createVersionTable, versionTableName, versionTableName, versionTableName))
-	return err
-}
-
-func (m *Migrator) versionTableExists(ctx context.Context) (ok bool, err error) {
-	var count int
-	err = m.conn.QueryRow(ctx, "select count(*) from pg_catalog.pg_class where relname=$1 and relkind='r' and pg_table_is_visible(oid)", versionTableName).Scan(&count)
-	return count > 0, err
-}
-
-func (m *Migrator) ForceVersion(ctx context.Context, version uint) error {
+func (m *Migrate) ForceVersion(ctx context.Context, version uint) error {
 	if int(version) > len(m.Migrations) {
 		return fmt.Errorf("version %d is higher than existent one", version)
 	}
-
 	_, err := m.conn.Exec(ctx, forceInsertVersionTable, version)
 
 	return err
 }
 
-func (m *Migrator) LoadMigrations(path string) error {
-
-	paths, err := FindMigrationsEx(path)
-	if err != nil {
-		return err
-	}
-
-	if len(paths) == 0 {
-		return fmt.Errorf("no migrations found at %s", path)
-	}
-
-	for _, p := range paths {
-		body, err := ioutil.ReadFile(p)
-		if err != nil {
-			return err
-		}
-
-		m.AppendMigration(filepath.Base(p), string(body))
-	}
-
-	return nil
-}
-
-func FindMigrationsEx(path string) ([]string, error) {
-	path = strings.TrimRight(path, string(filepath.Separator))
-
-	fileInfos, err := ioutil.ReadDir(path)
-	if err != nil {
-		return nil, err
-	}
-
-	paths := make([]string, 0, len(fileInfos))
-	for _, fi := range fileInfos {
-		if fi.IsDir() {
-			continue
-		}
-
-		matches := migrationPattern.FindStringSubmatch(fi.Name())
-		if len(matches) != 2 {
-			continue
-		}
-
-		n, err := strconv.ParseInt(matches[1], 10, 32)
-		if err != nil {
-			// The regexp already validated that the prefix is all digits so this *should* never fail
-			return nil, err
-		}
-
-		if n < int64(len(paths)+1) {
-			return nil, fmt.Errorf("duplicate migration %d", n)
-		}
-
-		if int64(len(paths)+1) < n {
-			return nil, fmt.Errorf("missing migration %d", len(paths)+1)
-		}
-
-		paths = append(paths, filepath.Join(path, fi.Name()))
-	}
-
-	return paths, nil
-}
-
-func (m *Migrator) AppendMigration(name, upSQL string) {
+func (m *Migrate) AppendMigration(name, upSQL string) {
 	m.Migrations = append(
 		m.Migrations,
 		&Migration{
@@ -161,12 +59,12 @@ func (m *Migrator) AppendMigration(name, upSQL string) {
 	return
 }
 
-func (m *Migrator) Migrate(ctx context.Context) error {
+func (m *Migrate) Migrate(ctx context.Context) error {
 	return m.MigrateTo(ctx, len(m.Migrations))
 }
 
 // MigrateTo migrates to targetVersion
-func (m *Migrator) MigrateTo(ctx context.Context, targetVersion int) (err error) {
+func (m *Migrate) MigrateTo(ctx context.Context, targetVersion int) (err error) {
 	err = acquireAdvisoryLock(ctx, m.conn)
 	if err != nil {
 		return err
@@ -178,7 +76,7 @@ func (m *Migrator) MigrateTo(ctx context.Context, targetVersion int) (err error)
 		}
 	}()
 
-	currentVersion, err := m.GetCurrentVersion(ctx)
+	currentVersion, err := getCurrentVersion(ctx, m.conn)
 	if err != nil {
 		return err
 	}

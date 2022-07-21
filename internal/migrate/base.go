@@ -2,6 +2,7 @@ package migrate
 
 import (
 	"context"
+	"fmt"
 	"github.com/jackc/pgx/v4"
 )
 
@@ -26,7 +27,35 @@ func createStoredVersionCheck(ctx context.Context, conn *pgx.Conn) error {
 	_, err := conn.Exec(ctx, "", lockNum)
 	return err
 }
-func (m *Migrator) GetCurrentVersion(ctx context.Context) (v int, err error) {
-	err = m.conn.QueryRow(ctx, "select version from "+versionTableName).Scan(&v)
+func getCurrentVersion(ctx context.Context, conn *pgx.Conn) (v int, err error) {
+	err = conn.QueryRow(ctx, "select version from "+versionTableName).Scan(&v)
 	return v, err
+}
+
+func ensureRequiredExists(ctx context.Context, conn *pgx.Conn) error {
+	err := acquireAdvisoryLock(ctx, conn)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		unlockErr := releaseAdvisoryLock(ctx, conn)
+		if err == nil && unlockErr != nil {
+			err = unlockErr
+		}
+	}()
+	var count int
+	//check if version table exists
+	if err := conn.QueryRow(ctx, checkVersionTableExists, versionTableName).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return err
+	}
+	_, err = conn.Exec(ctx, fmt.Sprintf(createVersionTable, versionTableName, versionTableName))
+	if err != nil {
+		return err
+	}
+	_, err = conn.Exec(ctx, fmt.Sprintf(createVersionCheckFunc, versionTableName))
+	return err
+
 }

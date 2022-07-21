@@ -2,25 +2,28 @@ package grpc
 
 import (
 	"context"
-	"github.com/b1uem0nday/tern/api"
+	p "github.com/b1uem0nday/tern/api/migrate"
+	"github.com/b1uem0nday/tern/internal/migrate"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"log"
 	"net"
 	"strconv"
 )
 
-type GrpcServer struct {
+type Server struct {
 	ctx      context.Context
 	gs       *grpc.Server
 	listener net.Listener
-	api.UnimplementedMigrationServiceServer
+	path     string
+	p.UnimplementedMigrationServiceServer
 }
 
-func NewGrpcServer(ctx context.Context, port uint64) (*GrpcServer, error) {
-	var gg GrpcServer
+func NewServer(ctx context.Context, path string, port uint64) (*Server, error) {
+	gg := Server{
+		ctx:  ctx,
+		path: path,
+	}
 	var err error
-	gg.ctx = ctx
 
 	gg.listener, err = net.Listen("tcp", ":"+strconv.FormatUint(port, 10))
 	if err != nil {
@@ -30,24 +33,34 @@ func NewGrpcServer(ctx context.Context, port uint64) (*GrpcServer, error) {
 	var opts []grpc.ServerOption
 
 	gg.gs = grpc.NewServer(opts...)
-	api.RegisterMigrationServiceServer(gg.gs, &gg)
+	p.RegisterMigrationServiceServer(gg.gs, &gg)
 	return &gg, nil
 }
 
-func (gg *GrpcServer) Run() (err error) {
+func (gg *Server) Run() {
 	log.Println("listening", gg.listener.Addr())
 	go gg.gs.Serve(gg.listener)
-	return nil
 }
 
-func (gg *GrpcServer) Connect(ctx context.Context, request *api.ConnectRequest) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, nil
-}
+func (gg *Server) Migrate(ctx context.Context, request *p.MigrateRequest) (*p.VersionMessage, error) {
+	var response p.VersionMessage
+	m, err := migrate.NewMigrator(ctx, request.ConnectionString)
+	if err != nil {
+		return &response, err
+	}
+	err = m.LoadMigrations(gg.path)
+	if err != nil {
+		return &response, err
+	}
+	if request.DestinationVersion == nil {
+		err = m.Migrate(ctx)
+	} else {
+		err = m.MigrateTo(ctx, int(*request.DestinationVersion))
+	}
 
-func (gg *GrpcServer) ConnectAndUpdate(ctx context.Context, request *api.ConnectAndUpdateRequest) (*api.VersionMessage, error) {
-	return &api.VersionMessage{}, nil
-}
-
-func (gg *GrpcServer) ForceVersion(ctx context.Context, message *api.VersionMessage) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, nil
+	if err != nil {
+		return &response, err
+	}
+	response.Version = uint64(len(m.Migrations))
+	return &response, nil
 }
