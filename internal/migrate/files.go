@@ -3,7 +3,6 @@ package migrate
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,11 +11,6 @@ import (
 
 //template - 0001-init.sql
 var filePattern = regexp.MustCompile(`\A(\d{1,4})-.+\.sql\z`)
-
-func (m *Migrate) LoadMigrationWithDefaultPath() error {
-	log.Printf("use default path: %s", defMigrationPath)
-	return m.LoadMigrations(defMigrationPath)
-}
 
 /*
 	LoadMigrations - opens the specified folder, sorts and loads all pattern-related files to Migrations
@@ -79,13 +73,7 @@ func loadValidPaths(path string) ([]string, error) {
 	}
 	return paths, err
 }
-func SetDefaultPath(path string) error {
-	if err := checkPathExistence(path); err != nil {
-		return err
-	}
-	defMigrationPath = path
-	return nil
-}
+
 func checkPathExistence(path string) error {
 	_, err := os.Stat(path)
 	if err != nil {

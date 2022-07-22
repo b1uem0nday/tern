@@ -10,19 +10,12 @@ import (
 var defMigrationPath string
 
 type (
-	Migrator interface {
-		ForceVersion(ctx context.Context, version uint) error
-		Migrate(ctx context.Context) error
-		MigrateTo(ctx context.Context, targetVersion int) error
-		DropServiceData(ctx context.Context) error
-	}
 	Migration struct {
 		Sequence int32
 		Name     string
 		SQL      string
 	}
 	Migrate struct {
-		scheme     string
 		conn       *pgx.Conn
 		Migrations []*Migration
 	}
@@ -35,7 +28,7 @@ func NewMigrator(ctx context.Context, connString string) (m *Migrate, err error)
 		return nil, err
 	}
 	m.Migrations = make([]*Migration, 0)
-	m.scheme = m.conn.Config().Database
+
 	err = ensureRequiredExists(ctx, m.conn)
 	if err != nil {
 		m.conn.Close(ctx)
@@ -44,20 +37,10 @@ func NewMigrator(ctx context.Context, connString string) (m *Migrate, err error)
 	return m, nil
 }
 
-func (m *Migrate) ForceVersion(ctx context.Context, version uint) error {
-	if int(version) > len(m.Migrations) {
-		return fmt.Errorf("version %d is higher than existent one", version)
-	}
-	_, err := m.conn.Exec(ctx, forceInsertVersionTable, version)
-	return err
-}
-
-func (m *Migrate) Migrate(ctx context.Context) error {
-	return m.MigrateTo(ctx, len(m.Migrations))
-}
-
-// MigrateTo migrates to targetVersion
-func (m *Migrate) MigrateTo(ctx context.Context, targetVersion int) (err error) {
+// Migrate migrates to last version
+func (m *Migrate) Migrate(ctx context.Context) (err error) {
+	defer m.conn.Close(ctx)
+	targetVersion := len(m.Migrations)
 	err = acquireAdvisoryLock(ctx, m.conn)
 	if err != nil {
 		return err
@@ -125,13 +108,6 @@ func (m *Migrate) MigrateTo(ctx context.Context, targetVersion int) (err error) 
 	}
 
 	return nil
-}
-
-/*
-	DropServiceData deletes existent tables & functions related to service
-*/
-func (m *Migrate) DropServiceData(ctx context.Context) error {
-	return dropService(ctx, m.conn)
 }
 
 func (m *Migrate) appendMigration(name, SQL string) {

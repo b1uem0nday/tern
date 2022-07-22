@@ -55,9 +55,3 @@ func ensureRequiredExists(ctx context.Context, conn *pgx.Conn) error {
 	return err
 
 }
-
-func dropService(ctx context.Context, conn *pgx.Conn) error {
-	_, err := conn.Exec(ctx, fmt.Sprintf(dropServiceData, versionTableName))
-
-	return err
-}

@@ -14,8 +14,6 @@ func TestMigrate_LoadMigrations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	schemePath, err := os.MkdirTemp(dir, "scheme")
-	fakeScheme := "/" + filepath.Base(schemePath)
 
 	if err != nil {
 		t.Fatal(err)
@@ -63,12 +61,11 @@ func TestMigrate_LoadMigrations(t *testing.T) {
 	}
 	fakeMigrate := Migrate{}
 	fakeMigrate.conn = &pgx.Conn{}
-	fakeMigrate.scheme = fakeScheme
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for i := range tt.files {
-				f, _ := os.Create(filepath.Join(tt.dir, fakeMigrate.scheme, tt.files[i]))
+				f, _ := os.Create(filepath.Join(tt.dir, tt.files[i]))
 				defer os.Remove(f.Name())
 			}
 
