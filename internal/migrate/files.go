@@ -22,7 +22,6 @@ func (m *Migrate) LoadMigrationWithDefaultPath() error {
 	LoadMigrations - opens the specified folder, sorts and loads all pattern-related files to Migrations
 */
 func (m *Migrate) LoadMigrations(path string) error {
-	path = path + m.scheme
 	if err := checkPathExistence(path); err != nil {
 		return err
 	}

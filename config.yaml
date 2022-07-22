@@ -1,0 +1,7 @@
+path: ./scripts/migrations
+base:
+  host: localhost
+  port: 5432
+  username: user
+  password: P@ssw0rd
+  scheme: test_migration

@@ -43,13 +43,13 @@ func TestMigrate_LoadMigrations(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:    "missing migrations №2",
+			name:    "missing migration №2",
 			dir:     dir,
 			files:   []string{"001-file.sql", "003-file.sql"},
 			wantErr: true,
 		},
 		{
-			name:    "migrations are not match",
+			name:    "migrations files and pattern are not match",
 			dir:     dir,
 			files:   []string{"file1.sql", "file2.sql"},
 			wantErr: true,
